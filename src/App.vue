@@ -123,6 +123,25 @@
             </button>
           </div>
         </div>
+
+        <div class="option-control" role="group" aria-label="Export background">
+          <span class="shape-label">
+            <Download :size="16" />
+            Export Background
+          </span>
+          <div class="segmented">
+            <button
+              v-for="option in exportBackgroundOptions"
+              :key="option.value"
+              type="button"
+              :disabled="!imageLoaded"
+              :class="{ active: settings.exportBackground === option.value }"
+              @click="setExportBackground(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </div>
       </section>
 
       <div v-if="errorMessage" class="status-card is-error" role="alert">
@@ -220,12 +239,18 @@ const settings = reactive({
   removeBackground: false,
   tilesX: 64,
   contrast: 0,
-  shape: 'square'
+  shape: 'square',
+  exportBackground: 'transparent'
 });
 
 const shapeOptions = [
   { value: 'square', label: 'Square', icon: Square },
   { value: 'circle', label: 'Dot', icon: Circle }
+];
+
+const exportBackgroundOptions = [
+  { value: 'transparent', label: 'Transparent' },
+  { value: 'preview', label: 'Preview BG' }
 ];
 
 let originalImage = null;
@@ -372,11 +397,22 @@ const setShape = (shapeName) => {
   renderCanvas();
 };
 
+const setExportBackground = (backgroundName) => {
+  settings.exportBackground = backgroundName;
+  lastExportedAt.value = null;
+};
+
 const renderCanvas = () => {
   if (!imageLoaded.value || !mainCanvas.value || !workingImage) return;
 
   const canvas = mainCanvas.value;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+  drawPixelArt(ctx, { showBackground: true, showGrid: true });
+};
+
+const drawPixelArt = (ctx, { showBackground, showGrid }) => {
+  const canvas = ctx.canvas;
   canvas.width = CANVAS_SIZE;
   canvas.height = CANVAS_SIZE;
 
@@ -387,11 +423,17 @@ const renderCanvas = () => {
   const data = imageData.data;
 
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-  ctx.fillStyle = '#EEF4FB';
-  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
   const tileSize = CANVAS_SIZE / settings.tilesX;
-  drawCanvasGrid(ctx, tileSize);
+
+  if (showBackground) {
+    ctx.fillStyle = '#EEF4FB';
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  }
+
+  if (showGrid) {
+    drawCanvasGrid(ctx, tileSize);
+  }
 
   ctx.fillStyle = '#0B0D12';
 
@@ -459,11 +501,20 @@ const drawCanvasGrid = (ctx, tileSize) => {
 };
 
 const downloadImage = () => {
-  if (!canExport.value || !mainCanvas.value) return;
+  if (!canExport.value || !workingImage) return;
+
+  const exportCanvas = document.createElement('canvas');
+  const exportCtx = exportCanvas.getContext('2d', { willReadFrequently: true });
+  const preservePreviewBackground = settings.exportBackground === 'preview';
+
+  drawPixelArt(exportCtx, {
+    showBackground: preservePreviewBackground,
+    showGrid: preservePreviewBackground
+  });
 
   const link = document.createElement('a');
   link.download = buildExportName();
-  link.href = mainCanvas.value.toDataURL('image/png');
+  link.href = exportCanvas.toDataURL('image/png');
   link.click();
 
   lastExportedAt.value = new Date();

@@ -374,7 +374,8 @@ input[type="range"]:disabled {
   opacity: 0.38;
 }
 
-.shape-control {
+.shape-control,
+.option-control {
   display: grid;
   gap: 8px;
 }
